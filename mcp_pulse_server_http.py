@@ -1,23 +1,23 @@
-# mcp_pulse_server_http.py - 完整版（含玩具控制）
-
+# mcp_pulse_server_http.py - 修正版（所有变量名已纠正）
 import asyncio
 import json
+import os
 import httpx
 from mcp.server import Server
 from mcp.server.sse import SseServerTransport
 from starlette.applications import Starlette
 from starlette.routing import Route, Mount
+from starlette.responses import JSONResponse
 import uvicorn
 import mcp.types as types
 
 # ---------- HTTP 客户端 ----------
-import os
 PULSE_API_BASE = os.environ.get("PULSE_API_BASE", "http://127.0.0.1:8000")
 
 async def fetch_pulse_status() -> str:
     """获取身体状态"""
     try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
+        async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(f"{PULSE_API_BASE}/bedside/body-status")
             if resp.status_code == 200:
                 data = resp.json()
@@ -49,20 +49,18 @@ async def fetch_pulse_status() -> str:
                     lines.append(f"体力：{stamina}%")
                 else:
                     lines.append("【玩具状态】未使用")
-                
                 return "\n".join(lines)
             else:
                 return f"Pulse 后端返回错误：{resp.status_code}"
     except httpx.ConnectError:
-        return "❌ 无法连接到 Pulse 后端，请确认 server.py 已启动（python server.py）"
+        return "❌ 无法连接到 Pulse 后端，请检查 PULSE_API_BASE 环境变量是否正确"
     except Exception as e:
         return f"❌ 获取状态失败：{str(e)}"
 
 # ---------- 玩具控制函数 ----------
 async def pulse_buy_toy(toy_id: str) -> str:
-    """购买玩具"""
     try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
+        async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.post(f"{PULSE_API_BASE}/bedside/buy", params={"toy_id": toy_id})
             if resp.status_code == 200:
                 return f"✅ 已购买玩具：{toy_id}"
@@ -72,9 +70,8 @@ async def pulse_buy_toy(toy_id: str) -> str:
         return f"❌ 请求失败：{str(e)}"
 
 async def pulse_start_toy(toy_id: str) -> str:
-    """开始使用玩具"""
     try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
+        async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.post(f"{PULSE_API_BASE}/bedside/use/start", params={"toy_id": toy_id})
             if resp.status_code == 200:
                 return f"✅ 已开始使用：{toy_id}，阶段 1/8"
@@ -84,9 +81,8 @@ async def pulse_start_toy(toy_id: str) -> str:
         return f"❌ 请求失败：{str(e)}"
 
 async def pulse_next_stage() -> str:
-    """推进玩具阶段"""
     try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
+        async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.post(f"{PULSE_API_BASE}/bedside/use/next")
             if resp.status_code == 200:
                 data = resp.json()
@@ -97,12 +93,11 @@ async def pulse_next_stage() -> str:
         return f"❌ 请求失败：{str(e)}"
 
 async def pulse_switch_position(position_id: str) -> str:
-    """切换体位"""
     valid_positions = ["sitting", "lying_back", "kneeling", "side_lying", "standing", "leaning"]
     if position_id not in valid_positions:
         return f"❌ 无效体位，可选：{', '.join(valid_positions)}"
     try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
+        async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.post(f"{PULSE_API_BASE}/bedside/use/position", params={"position_id": position_id})
             if resp.status_code == 200:
                 return f"✅ 已切换体位：{position_id}"
@@ -112,9 +107,8 @@ async def pulse_switch_position(position_id: str) -> str:
         return f"❌ 请求失败：{str(e)}"
 
 async def pulse_shop() -> str:
-    """查看玩具商店"""
     try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
+        async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(f"{PULSE_API_BASE}/bedside/shop")
             if resp.status_code == 200:
                 data = resp.json()
@@ -236,5 +230,11 @@ starlette_app = Starlette(
     ],
 )
 
+# 健康检查端点
+@starlette_app.route("/health")
+async def health_check(request):
+    return JSONResponse({"status": "ok"})
+
 if __name__ == "__main__":
-    uvicorn.run(starlette_app, host="0.0.0.0", port=8001)
+    port = int(os.environ.get("PORT", 8001))
+    uvicorn.run(starlette_app, host="0.0.0.0", port=port)
