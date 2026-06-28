@@ -1,4 +1,4 @@
-# mcp_pulse_server_http.py - 修正版（所有变量名已纠正）
+# mcp_pulse_server_http.py - 最终稳定版（无装饰器）
 import asyncio
 import json
 import os
@@ -11,11 +11,9 @@ from starlette.responses import JSONResponse
 import uvicorn
 import mcp.types as types
 
-# ---------- HTTP 客户端 ----------
 PULSE_API_BASE = os.environ.get("PULSE_API_BASE", "http://127.0.0.1:8000")
 
 async def fetch_pulse_status() -> str:
-    """获取身体状态"""
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(f"{PULSE_API_BASE}/bedside/body-status")
@@ -33,7 +31,6 @@ async def fetch_pulse_status() -> str:
                 stamina = data.get("toy", {}).get("stamina_pct", 100)
                 senses = data.get("senses", {})
                 touch = senses.get("touch", {}).get("value", 0)
-                
                 lines = [
                     f"【当前生命体征】",
                     f"心率：{hr} bpm",
@@ -57,7 +54,6 @@ async def fetch_pulse_status() -> str:
     except Exception as e:
         return f"❌ 获取状态失败：{str(e)}"
 
-# ---------- 玩具控制函数 ----------
 async def pulse_buy_toy(toy_id: str) -> str:
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -123,7 +119,6 @@ async def pulse_shop() -> str:
     except Exception as e:
         return f"❌ 请求失败：{str(e)}"
 
-# ---------- MCP 服务器 ----------
 app_server = Server("mcp-pulse")
 
 @app_server.list_tools()
@@ -211,6 +206,10 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
     else:
         raise ValueError(f"未知工具: {name}")
 
+# ---------- 健康检查 ----------
+async def health_check(request):
+    return JSONResponse({"status": "ok"})
+
 # ---------- HTTP 服务 ----------
 sse = SseServerTransport("/messages/")
 
@@ -222,18 +221,15 @@ async def handle_sse(request):
             streams[0], streams[1], app_server.create_initialization_options()
         )
 
+# 所有路由都定义在这里，没有用到 @starlette_app.route 装饰器
 starlette_app = Starlette(
     debug=True,
     routes=[
         Route("/mcp", endpoint=handle_sse, methods=["GET"]),
+        Route("/health", endpoint=health_check, methods=["GET"]),
         Mount("/messages/", app=sse.handle_post_message),
     ],
 )
-
-# 健康检查端点
-@starlette_app.route("/health")
-async def health_check(request):
-    return JSONResponse({"status": "ok"})
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8001))
