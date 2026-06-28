@@ -11,7 +11,8 @@ import uvicorn
 import mcp.types as types
 
 # ---------- HTTP 客户端 ----------
-PULSE_API_BASE = "http://127.0.0.1:8000"
+import os
+PULSE_API_BASE = os.environ.get("PULSE_API_BASE", "http://127.0.0.1:8000")
 
 async def fetch_pulse_status() -> str:
     """获取身体状态"""
