@@ -487,6 +487,12 @@ state = PulseState()
 async def root():
     return {"message": "脉·Pulse v1", "docs": "/docs"}
 
+# ----- 新增 /health 端点（支持 GET 和 HEAD） -----
+@app.get("/health")
+@app.head("/health")
+async def health_check():
+    return {"status": "ok", "service": "Pulse System"}
+
 @app.get("/bedside/body-status")
 async def get_body_status():
     return state.get_status()
@@ -748,4 +754,5 @@ async def forge_filter(text: str):
 
 # ---------- 启动 ----------
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
